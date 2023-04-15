@@ -23,8 +23,8 @@ namespace Notes_ClassLibrary
         //====================
         // Properties
         //====================
-        public int ID { get; set; }
-        public List<Patient> Patients { get; set; }
+        public long ID { get; set; }
+        public Patient Patient { get; set; }
 
         //====================
         // Constructors
@@ -33,15 +33,14 @@ namespace Notes_ClassLibrary
         public Record()
         {
             ID = 0;
-            Patients = new List<Patient>();
-
+            Patient = new Patient();
         }
 
         // Non-Default
-        public Record(Patient patient)
-        {
-            ID = int.Parse(DateTime.Now.ToString("yyMMddHHmmss")); // Sets Patient Id as follows YearMonthDay_HourMinuteSecond
-            Patients.Add(patient);
+        public Record(long noteId, Patient patient)
+        {            
+            ID = noteId;
+            Patient = patient;
         }
 
         //====================
@@ -53,13 +52,11 @@ namespace Notes_ClassLibrary
         // Parameters: None
         // Returns: List of string arrays of already splitted records by '|'
         // Description: Reads records from file 'patients.txt'. Splits records by '|' and returns them in a list of string arrays
-        // Will be used to load records from file when the application loads
-        // public List<string[]> ReadRecords() // Returns string arrays
+        // Will be used to load records from file when the application loads        
         public List<string> ReadRecords()
         {
             // Initial Declarations
-            string record = "";
-            // List<string[]> records = new List<string[]>(); // Stores string arrays
+            string record = "";            
             List<string> records = new List<string>(); // Store strings
 
             // Reads stored records
@@ -71,22 +68,57 @@ namespace Notes_ClassLibrary
                     // records.Add(record.Split("|")); // Splits records by '||'
                     records.Add(record);
                 }
-
             }
 
-            // Returns a list of string arrays
+            // Returns a list of records
             return records;
         }
 
         //--------------------
         // AddRecord
         //--------------------
-        // Parameters: None
-        // Returns: 
-        // Description: Adds a new record
-        public void AddRecord() // int id, Patient patient
+        // Parameters: long (noteId) & Patient (object)
+        // Returns: void
+        // Description: Writes a new record in the patients.txt file. The method receives passed parameters, formats the data to match
+        // the correct format of stored records & uses StreamWriter to perform the actual insertion of the data into the file.
+        public void AddRecord(long noteId, Patient patient) // int id, Patient patient
         {
+            // Building note string to be inserted into .txt file
+            string dataForInsertion = $"{noteId}|";
+            dataForInsertion += $"{patient.PatientName}|";
+            dataForInsertion += $"{patient.PatientDoB.ToString("dd MMM yyyy")}|";
 
+            // Iterate over problems List and sets the appropiate string format
+            foreach (var problem in patient.Problems)
+            {
+                // Checks if it is the last item of the Problems List
+                if (problem == patient.Problems.Last())
+                {
+                    dataForInsertion += $"{problem.PatientProblem}|";
+                }
+                else
+                {
+                    dataForInsertion += $"{problem.PatientProblem};";
+                }
+            }
+
+            // Replace all new lines (\n) with separator (;) and setting the clinical note in the proper format to be stored
+            dataForInsertion += patient.Note.Replace("\n", ";");
+
+            // Adds User to the file patients.txt
+            using (StreamWriter writer = new StreamWriter(_file, true))
+            {
+                // Used as examples of how I want the data to be stored
+                // writer.WriteLine($"230410120218|Lisa Simpson|31 May 2004|Diabetes;Hypertension|BP: 120/80;;Diabetes under control|");
+                // writer.WriteLine($"230410120436|Homer Simpson|31 May 2004|Overweight|BP: 134/89;BP: 130/85;HR: 44;HR: 101|");
+
+                writer.WriteLine(dataForInsertion);
+                
+                // Last time I had to use .Close() bc the computer kept on freezing. Just leaving this here in case I need it again
+                // writer.Close();
+            }
+
+            // I am leaving this for reference.
             /*
             Console.WriteLine("File Created");
             string directory = Directory.GetCurrentDirectory();
@@ -94,16 +126,20 @@ namespace Notes_ClassLibrary
             string fullPath = directory + "\\" + "patients.txt";
             File.Create(fullPath);
             */
-
-            // Adds User to the file patients.txt
-            using (StreamWriter writer = new StreamWriter(_file, true))
-            {
-                writer.WriteLine($"230410120218|Lisa Simpson|31 May 2004|Diabetes;Hypertension|BP: 120/80;;Diabetes under control|");
-                writer.WriteLine($"230410120436|Homer Simpson|31 May 2004|Overweight|BP: 134/89;BP: 130/85;HR: 44;HR: 101|");
-                writer.Close();
-            }
         }
 
+        //--------------------
+        // CreateId
+        //--------------------
+        // Parameters: none
+        // Returns: void
+        // Description: This method enables inputs & controls when "Start new note" button is clicked
+        public long CreateId()
+        {
+            // Sets Patient Id as follows YearMonthDay_HourMinuteSecond
+            long id = long.Parse(DateTime.Now.ToString("yyMMddHHmmss")); 
+            return id;
+        }
     }
 
     // Class Patient
@@ -114,8 +150,8 @@ namespace Notes_ClassLibrary
         //====================
         public string PatientName { get; set; }
         public DateTime PatientDoB { get; set; }
-        // public List<Problem> Problems { get; set; }
-        public Dictionary<int, List<Problem>> Problems { get; set; } // TODO: USE DICTIONARY FOR PROBLEMS key: "patient", value: "list of problems"
+        public List<Problem> Problems { get; set; }
+        public string Note { get; set; }
 
         //====================
         // Constructors
@@ -126,16 +162,17 @@ namespace Notes_ClassLibrary
             PatientName = null;
             PatientDoB = DateTime.Now;
             // Problems = new List<Problem>();
-            Problems  = new Dictionary<int, List<Problem>>();
+            Problems  = new List<Problem>();
+            Note = null;
         }
 
         // Non-Default
-        public Patient(string patientName, DateTime patientDoB, Problem problem)
+        public Patient(string patientName, DateTime patientDoB, List<Problem> problems, string note)
         {
             PatientName = patientName;
             PatientDoB = patientDoB;
-            // Problems.Add(problem);
-            Problems = new Dictionary<int, List<Problem>>();
+            Problems = problems;
+            Note = note;
         }
 
         //====================
@@ -145,13 +182,12 @@ namespace Notes_ClassLibrary
     }
 
     // Class Problem
-    public class Problem
+    public class Problem : Patient
     {
         //====================
         // Properties / Fields
-        //====================        
-        public string PatientName { get; set; }
-        public DateTime PatientDoB { get; set; }
+        //====================
+        public string PatientProblem { get; set; }
 
         //====================
         // Constructors
@@ -159,14 +195,13 @@ namespace Notes_ClassLibrary
         // Default
         public Problem()
         {
-
+            PatientProblem = null;
         }
 
         // Non-Default
-        public Problem(string patientName, DateTime patientDoB)
+        public Problem(string patientProblem)
         {
-            PatientName = patientName;
-            PatientDoB = patientDoB;
+            PatientProblem = patientProblem;
         }
 
         //====================
